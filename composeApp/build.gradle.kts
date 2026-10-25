@@ -30,11 +30,24 @@ compose.desktop {
     application {
         mainClass = "btm.m.vthief.MainKt"
         nativeDistributions {
-            targetFormats(TargetFormat.Msi, TargetFormat.Dmg, TargetFormat.Deb)
+            targetFormats(TargetFormat.Exe)
             packageName = "V-Thief"
             packageVersion = "0.1.0"
             description = "A cross-platform VOCALOID voicebank editor"
         }
     }
+}
+
+tasks.register("buildExe") {
+    group = "distribution"
+    description = "Build the runnable V-Thief.exe desktop distribution."
+    dependsOn("createDistributable")
+    doLast {
+        println("V-Thief.exe: ${layout.buildDirectory.get().asFile.resolve("compose/binaries/main/app/V-Thief/V-Thief.exe")}")
+    }
+}
+
+tasks.named("build") {
+    dependsOn("buildExe")
 }
 

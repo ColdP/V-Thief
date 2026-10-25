@@ -71,14 +71,62 @@ class SoundBankRepository {
         DdiSummary(bytes.size.toLong(), sections, phonemes, text.count { it == 'S' })
     }
 
-    suspend fun exportSample(ddbPath: String, sample: SampleRecord, outputPath: String) = withContext(Dispatchers.Default) {
+    suspend fun resolveCompId(files: List<VoicebankFile>): String? = withContext(Dispatchers.Default) {
+        val vvd = files.firstOrNull { it.type == FileType.VVD }
+        if (vvd != null) {
+            val value = inspectVvd(vvd.path)?.compId
+            if (!value.isNullOrBlank() && value.length == 16 && value.startsWith("B")) return@withContext value
+        }
+        val ddi = files.firstOrNull { it.type == FileType.DDI } ?: return@withContext null
+        Regex("\\b[A-Z0-9]{16}\\b")
+            .findAll(PlatformFile(ddi.path).readBytes().decodeToString())
+            .map { it.value }
+            .firstOrNull { it.startsWith("B") }
+    }
+
+    suspend fun inspectVvd(vvdPath: String): VvdMetadata? = withContext(Dispatchers.Default) {
+        val text = VvdCodec.transcode(PlatformFile(vvdPath).readBytes().decodeToString())
+        fun field(key: String): String = Regex("\\\"${Regex.escape(key)}\\\"\\s*=\\s*\\\"([^\\\"]*)\\\"")
+            .find(text)?.groupValues?.getOrNull(1).orEmpty()
+        val compId = field("VOICEIDSTR")
+        if (compId.isBlank() || compId.length != 16 || !compId.startsWith("B")) return@withContext null
+        VvdMetadata(
+            compId = compId,
+            voiceName = field("VOICENAME"),
+            format = field("FORMAT"),
+            voiceType = field("ID"),
+            parameters = listOf("Breathiness", "Brightness", "Clearness", "Opening", "Gender Factor", "Growl")
+                .associateWith(::field),
+        )
+    }
+
+    suspend fun sampleWav(ddbPath: String, sample: SampleRecord): ByteArray = withContext(Dispatchers.Default) {
         val bytes = PlatformFile(ddbPath).readBytes()
         require(sample.offset >= 0 && sample.offset + sample.length <= bytes.size) { "采样偏移超出 DDB 范围" }
         val offset = sample.offset.toInt()
         val actualLength = readInt(bytes, offset + 4)
         require(actualLength == sample.length) { "采样记录与 DDB 已不一致" }
         val pcm = bytes.copyOfRange(offset + 18, offset + actualLength)
-        PlatformFile(outputPath).writeBytes(wavHeader(sample.sampleRate, sample.channels, pcm.size) + pcm)
+        wavHeader(sample.sampleRate, sample.channels, pcm.size) + pcm
+    }
+
+    suspend fun exportSample(ddbPath: String, sample: SampleRecord, outputPath: String) = withContext(Dispatchers.Default) {
+        PlatformFile(outputPath).writeBytes(sampleWav(ddbPath, sample))
+    }
+
+    suspend fun annotateSamples(ddbPath: String, ddiPath: String?, samples: List<SampleRecord>): List<SampleRecord> = withContext(Dispatchers.Default) {
+        if (ddiPath.isNullOrBlank()) return@withContext samples
+        val ddi = PlatformFile(ddiPath).readBytes()
+        val phonemeTokens = Regex("(?:\\^?[a-zA-Z0-9@{}\\\\:;!?<>*~()\\-]+)")
+            .findAll(ddi.decodeToString())
+            .map { it.value }
+            .filter { it.length <= 24 && it.any(Char::isLetter) }
+            .distinct()
+            .toList()
+        samples.mapIndexed { index, sample ->
+            val hints = phonemeTokens.drop(index % phonemeTokens.size.coerceAtLeast(1)).take(2)
+            sample.copy(phonemes = hints)
+        }
     }
 
     suspend fun exportAllSamples(ddbPath: String, outputDirectory: String, samples: List<SampleRecord>) = withContext(Dispatchers.Default) {

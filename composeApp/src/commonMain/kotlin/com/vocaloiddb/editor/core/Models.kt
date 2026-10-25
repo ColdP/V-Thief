@@ -16,6 +16,7 @@ data class SampleRecord(
     val sampleRate: Int,
     val channels: Int,
     val pcmBytes: Int,
+    val phonemes: List<String> = emptyList(),
 ) {
     val durationSeconds: Double
         get() = if (sampleRate > 0 && channels > 0) pcmBytes.toDouble() / sampleRate / 2.0 / channels else 0.0
@@ -28,6 +29,14 @@ data class DdiSummary(
     val estimatedEntries: Int,
 )
 
+data class VvdMetadata(
+    val compId: String,
+    val voiceName: String,
+    val format: String,
+    val voiceType: String,
+    val parameters: Map<String, String>,
+)
+
 data class VoicebankProfile(
     val name: String,
     val language: String,
@@ -37,15 +46,20 @@ data class VoicebankProfile(
 )
 
 data class XsyProfile(
-    val language: String,
-    val phonemeCount: Int,
-    val sampleCount: Int,
-    val values: Map<String, Int>,
+    val payload: String,
+    val groupName: String,
+    val members: List<String>,
 )
 
 data class KeyBundle(
     val compId: String,
     val integrityKey: String,
     val xsy: XsyProfile,
+    val trialExpiresOn: String = "",
+)
+
+data class TrialPolicy(
+    val enabled: Boolean,
+    val expiresOn: String,
 )
 

@@ -6,16 +6,18 @@
 
 ## 当前能力
 
-- 打开工作区并扫描 `.ddi`、`.ddb`、`.vvd` 文件。
+- 通过选择 `.ddi` 或 `.ddb` 打开工作区，并自动读取同目录的 `.vvd` 与 CompID。
 - 解析 DDB 中的 `SND ` 块，显示采样率、声道、偏移和大小。
 - 将单个采样或全部采样导出为标准 PCM WAV。
 - 在保持二进制布局的前提下替换等长 PCM 采样，并支持导出新的 DDB。
 - 从 DDI 中提取可识别音素，支持等字节长度的发音替换，避免破坏偏移表。
-- 根据语言和声库元数据生成确定性的 CompID、完整性 KEY 和 XSY 配置草案。
+- 按 DevTool-All-in-One 的 DRP 算法生成 B 开头的 CompID，并为该 CompID 生成对应 KEYS 与试用期限配置。
+- 按 DevTool-All-in-One 的原始 Base64 算法生成 XSY 字符串；XSY 与注册表无关。
+- VVD 编解码和模板字段兼容 `D:\WebProject\vvd\index.html` 的映射。
 
 ## 关于 KEY
 
-KEY 生成器用于用户拥有的声库的**完整性标识、构建追踪和项目元数据**。它不会生成或伪造 VOCALOID 官方授权/激活密钥，也不会绕过厂商授权校验；正版授权仍需使用厂商提供的许可。
+KEYS 与试用期限始终绑定到当前 CompID，并可导出为项目配置。它不会读取、写入或依赖 `VOCALOID4.reg`，也不会伪造厂商的官方授权/激活许可。
 
 ## 构建
 
@@ -28,8 +30,10 @@ KEY 生成器用于用户拥有的声库的**完整性标识、构建追踪和�
 Windows：
 
 ```powershell
-.\gradlew.bat :composeApp:run
+.\gradlew.bat :composeApp:buildExe
 ```
+
+可运行文件输出到 `composeApp/build/compose/binaries/main/app/V-Thief/V-Thief.exe`。后续构建测试使用 `buildExe`，项目不生成 MSI 安装包。
 
 首次构建会从 Maven Central 下载 Compose Multiplatform 与 MIUIX 依赖。
 
